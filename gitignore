@@ -21,6 +21,8 @@
 
 # Maven target directory
 /target/
+*.tokens
+*.interp
 
 # VS Code settings
 .vscode/
@@ -33,3 +35,4 @@ Thumbs.db
 
 # Generated sources (ANTLR)
 **/generated-sources/
+
