@@ -1,8 +1,15 @@
 package tc.errors;
 
 import org.antlr.v4.runtime.*;
+import tc.semantics.ErrorReporter;
 
 public class BaseErrorListener extends org.antlr.v4.runtime.BaseErrorListener {
+
+    private final ErrorReporter reporter;
+
+    public BaseErrorListener(ErrorReporter reporter) {
+        this.reporter = reporter;
+    }
 
     @Override
     public void syntaxError(Recognizer<?, ?> recognizer,
@@ -10,10 +17,11 @@ public class BaseErrorListener extends org.antlr.v4.runtime.BaseErrorListener {
                             int line,
                             int charPositionInLine,
                             String msg,
-                            RecognitionException e)
-    {
-        String error = String.format("Error en línea %d:%d - %s",
-                                     line, charPositionInLine, msg);
-        System.err.println(error);
+                            RecognitionException e) {
+        String error = "L" + line + ":" + charPositionInLine + " - " + msg;
+        System.err.println(error);                  // sigue apareciendo en consola
+        if (reporter != null) {
+            reporter.addSyntax(error);              // también lo guardamos
+        }
     }
 }
