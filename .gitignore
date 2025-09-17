@@ -33,5 +33,5 @@
 .DS_Store
 Thumbs.db
 
-# (opcional) otras carpetas generadas
 **/generated-sources/
+/reports/
