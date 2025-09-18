@@ -112,4 +112,54 @@ public class CodeGenVisitor extends CminiBaseVisitor<String> {
 
         return null;
     }
+
+    @Override
+    public String visitIfStat(CminiParser.IfStatContext ctx) {
+        String cond = visit(ctx.expr());
+        Label Ltrue = gen.newLabel();
+        Label Lend = gen.newLabel();
+
+        // if (cond) goto Ltrue
+        gen.emit("if " + cond + " goto " + Ltrue.getName());
+        gen.emit("goto " + Lend.getName());
+
+        // bloque del if
+        gen.emit(Ltrue.toString());
+        visit(ctx.statement(0));
+
+        // else opcional
+        if (ctx.statement().size() > 1) {
+            Label Lelse = gen.newLabel();
+            // salto al final desde if
+            Label Lafter = gen.newLabel();
+            gen.emit("goto " + Lafter.getName());
+
+            // else
+            gen.emit(Lelse.toString());
+            visit(ctx.statement(1));
+
+            gen.emit(Lafter.toString());
+        } else {
+            gen.emit(Lend.toString());
+        }
+        return null;
+    }
+
+    @Override
+    public String visitWhileStat(CminiParser.WhileStatContext ctx) {
+        Label Lbegin = gen.newLabel();
+        Label Lend = gen.newLabel();
+
+        gen.emit(Lbegin.toString());
+        String cond = visit(ctx.expr());
+        gen.emit("if " + cond + " goto " + Lend.getName());
+
+        // cuerpo del while
+        visit(ctx.statement());
+
+        gen.emit("goto " + Lbegin.getName());
+        gen.emit(Lend.toString());
+
+        return null;
+    }
 }
