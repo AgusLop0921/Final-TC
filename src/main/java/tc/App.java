@@ -10,6 +10,9 @@ import tc.semantics.ErrorReporter;
 import tc.semantics.MiListener;
 import tc.symbols.TablaDeSimbolos;
 
+import tc.intermediate.CodeGenerator;
+import tc.intermediate.CodeGenVisitor;
+
 import java.nio.file.*;
 
 public class App {
@@ -65,5 +68,12 @@ public class App {
         }
         reporterSyntax.guardar("reports/syntax.txt", null);
 
+        CodeGenerator cg = new CodeGenerator();
+        CodeGenVisitor codegen = new CodeGenVisitor(cg);
+        codegen.visit(tree);
+
+        java.nio.file.Files.createDirectories(java.nio.file.Path.of("reports"));
+        java.nio.file.Files.writeString(java.nio.file.Path.of("reports/intermediate.txt"), cg.dump());
+        System.out.println("TAC generado en reports/intermediate.txt");
     }
 }
