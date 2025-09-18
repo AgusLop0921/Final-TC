@@ -19,9 +19,9 @@ public class BaseErrorListener extends org.antlr.v4.runtime.BaseErrorListener {
                             String msg,
                             RecognitionException e) {
         String error = "L" + line + ":" + charPositionInLine + " - " + msg;
-        System.err.println(error);                  // sigue apareciendo en consola
+        System.err.println(error);
         if (reporter != null) {
-            reporter.addSyntax(error);              // también lo guardamos
+            reporter.addSyntax(error);
         }
     }
 }
