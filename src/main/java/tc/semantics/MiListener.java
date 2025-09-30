@@ -1,8 +1,5 @@
 package tc.semantics;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 
@@ -20,7 +17,6 @@ public class MiListener extends CminiBaseListener {
         this.reporter = reporter;
     }
 
-    // --------- Helpers ---------
     private void err(Token t, String m) {
         String at = "L" + t.getLine() + ":" + t.getCharPositionInLine();
         reporter.addSemantic(at + " - " + m);
@@ -30,37 +26,38 @@ public class MiListener extends CminiBaseListener {
         return Tipo.fromString(tctx.getText());
     }
 
-    private Tipo inferirLiteral(CminiParser.ExprContext e) {
-        if (e.INT() != null) return Tipo.INT;
-        if (e.FLOAT() != null) return Tipo.FLOAT;
-        return Tipo.DESCONOCIDO;
-    }
-
-    // --------- Contextos ---------
-
+    //  Contextos 
     @Override
     public void enterFunctionDecl(CminiParser.FunctionDeclContext ctx) {
-        // Nuevo contexto de función
         String nombre = ctx.ID().getText();
+        Tipo ret = tipoFrom(ctx.type());
+
+        // Registrar la función como símbolo
+        Funcion f = new Funcion(nombre, ret);
+        if (!ts.global().declarar(f)) {
+            err(ctx.ID().getSymbol(), "Función duplicada: '" + nombre + "'");
+        }
+
+        // Nuevo contexto para la función
         ts.push("fn:" + nombre);
 
-        // Parámetros como variables inicializadas
+        // Parámetros
         if (ctx.paramList() != null) {
             for (var p : ctx.paramList().param()) {
                 String pid = p.ID().getText();
                 Tipo pt = tipoFrom(p.type());
                 Variable v = new Variable(pid, pt);
-                v.marcarInicializada(); // convención
+                v.marcarInicializada();
                 if (!ts.actual().declarar(v)) {
                     err(p.ID().getSymbol(), "Parámetro duplicado: '" + pid + "'");
                 }
+                f.addParametro(v);
             }
         }
     }
 
     @Override
     public void exitFunctionDecl(CminiParser.FunctionDeclContext ctx) {
-        // Al salir, marcamos no usados
         for (var e : ts.actual().ids().values()) {
             if (e instanceof Variable v && !v.usada()) {
                 err(ctx.ID().getSymbol(), "Identificador declarado pero no usado: '" + v.nombre() + "'");
@@ -84,61 +81,67 @@ public class MiListener extends CminiBaseListener {
         ts.pop();
     }
 
-    // --------- Declaración de variable ---------
-
+    //  Declaración de variable 
     @Override
     public void enterVarDecl(CminiParser.VarDeclContext ctx) {
         String id = ctx.ID().getText();
         Tipo t = tipoFrom(ctx.type());
-        Variable v = new Variable(id, t);
 
-        // Doble declaración en el mismo contexto
+        int dimension = 0;
+        if (ctx.INT() != null) {
+            dimension = Integer.parseInt(ctx.INT().getText());
+        }
+
+        Variable v = new Variable(id, t, dimension);
+
         if (!ts.actual().declarar(v)) {
             err(ctx.ID().getSymbol(), "Doble declaración del mismo identificador: '" + id + "'");
             return;
         }
 
-        // Inicialización opcional
-        if (ctx.expr() != null) {
-            Tipo rhs = inferirExpr(ctx.expr()); // inferencia simple (abajo)
-            if (!Tipo.asignable(t, rhs)) {
-                err(ctx.ID().getSymbol(), "Tipos de datos incompatibles en inicialización de '" + id +
-                        "': " + t + " = " + rhs);
-            }
+        // Si es array, lo marcamos como inicializado al declararlo
+        if (v.esArray()) {
             v.marcarInicializada();
-            v.setValor(ctx.expr().getText());
         }
     }
 
-    // --------- Asignación ---------
-
+    //  Asignación 
     @Override
     public void enterAssignStat(CminiParser.AssignStatContext ctx) {
         Token idTok = ctx.ID().getSymbol();
         String id = ctx.ID().getText();
-
         Id sim = ts.actual().resolver(id);
+
         if (sim == null) {
             err(idTok, "Uso de un identificador no declarado: '" + id + "'");
             return;
         }
         if (!(sim instanceof Variable v)) return;
 
-        Tipo rhs = inferirExpr(ctx.expr());
-        if (!Tipo.asignable(v.tipo(), rhs)) {
-            err(idTok, "Tipos de datos incompatibles en asignación a '" + id + "': " +
-                    v.tipo() + " = " + rhs);
+        if (ctx.expr().size() == 2) {
+            Tipo indexT = inferirExpr(ctx.expr(0));
+            if (indexT != Tipo.INT) {
+                err(idTok, "Índice de array debe ser int en '" + id + "'");
+            }
+            Tipo rhs = inferirExpr(ctx.expr(1));
+            if (!Tipo.asignable(v.tipo(), rhs)) {
+                err(idTok, "Tipos incompatibles en asignación a array '" + id + "'");
+            }
+        } else { // var = expr
+            Tipo rhs = inferirExpr(ctx.expr(0));
+            if (!Tipo.asignable(v.tipo(), rhs)) {
+                err(idTok, "Tipos incompatibles en asignación a '" + id + "'");
+            }
+            v.marcarInicializada();
+            v.setValor(ctx.expr(0).getText());
         }
-        v.marcarInicializada();
-        v.setValor(ctx.expr().getText());
     }
 
-    // --------- Uso de identificadores en expresiones ---------
-
+    //  Uso de expresiones 
     @Override
     public void enterExpr(CminiParser.ExprContext ctx) {
-        // Si la expresión es un ID solito (no es llamada a función), marcar uso y chequear inicialización
-        if (ctx.ID() != null && ctx.op == null && ctx.funcCall() == null) {
+        // Caso variable normal
+        if (ctx.ID() != null && ctx.getChildCount() == 1) {
             Token tok = ctx.ID().getSymbol();
             String id = ctx.ID().getText();
             Id sim = ts.actual().resolver(id);
@@ -153,31 +156,62 @@ public class MiListener extends CminiBaseListener {
                 }
             }
         }
+
+        // Caso acceso array: ID '[' expr ']'
+        if (ctx.ID() != null && ctx.getChildCount() == 4) {
+            String id = ctx.ID().getText();
+            Id sim = ts.actual().resolver(id);
+            if (sim instanceof Variable v && v.esArray()) {
+                v.marcarUsada();
+                v.marcarInicializada(); // consideramos el array declarado como "usable"
+            }
+        }
     }
 
-    // --------- Inferencia mínima de tipo para expr ---------
-
+    //  Inferencia de tipos 
     private Tipo inferirExpr(CminiParser.ExprContext e) {
-        // Literales
-        if (e.INT() != null) return Tipo.INT;
-        if (e.FLOAT() != null) return Tipo.FLOAT;
+        if (e == null) return Tipo.DESCONOCIDO;
 
-        // ID
-        if (e.ID() != null && e.op == null && e.funcCall() == null) {
+        // Literales
+        if (e.literal() != null) {
+            if (e.literal().INT() != null) return Tipo.INT;
+            if (e.literal().FLOAT() != null) return Tipo.FLOAT;
+            if (e.literal().CHAR_LITERAL() != null) return Tipo.CHAR;
+            if (e.literal().TRUE() != null || e.literal().FALSE() != null) return Tipo.BOOL;
+        }
+
+        // Identificador simple
+        if (e.ID() != null && e.getChildCount() == 1) {
             Id sim = ts.actual().resolver(e.ID().getText());
             return sim != null ? sim.tipo() : Tipo.DESCONOCIDO;
         }
 
-        // Llamada a función (para TP2 no exigimos verificación de firma; devolvemos UNKNOWN)
-        if (e.funcCall() != null) return Tipo.DESCONOCIDO;
+        // Acceso a array
+        if (e.ID() != null && e.getChildCount() == 4) {
+            Id sim = ts.actual().resolver(e.ID().getText());
+            if (sim instanceof Variable v && v.esArray()) {
+                return v.tipo(); // el tipo base
+            }
+        }
 
-        // Operaciones -> si ambos numéricos, promovemos; sino desconocido
-        if (e.op != null && e.expr().size() == 2) {
+        // Llamada a función
+        if (e.funcCall() != null) {
+            Id sim = ts.actual().resolver(e.funcCall().ID().getText());
+            if (sim instanceof Funcion f) {
+                return f.retorno();
+            }
+            return Tipo.DESCONOCIDO;
+        }
+
+        // Operación binaria
+        if (e.expr().size() == 2) {
             Tipo a = inferirExpr(e.expr(0));
             Tipo b = inferirExpr(e.expr(1));
             if (a.esNumerico() && b.esNumerico()) {
-                // int (+,-,*,/) float -> float
-                return (a == Tipo.FLOAT || b == Tipo.FLOAT) ? Tipo.FLOAT : Tipo.INT;
+                return (a == Tipo.DOUBLE || b == Tipo.DOUBLE) ? Tipo.DOUBLE : Tipo.INT;
+            }
+            if (a == Tipo.BOOL && b == Tipo.BOOL) {
+                return Tipo.BOOL;
             }
             return Tipo.DESCONOCIDO;
         }
@@ -190,8 +224,7 @@ public class MiListener extends CminiBaseListener {
         return Tipo.DESCONOCIDO;
     }
 
-    // --------- Utilidad pública ---------
-
+    //  Utilidad pública 
     public static void walk(CminiParser.ProgramContext tree, TablaDeSimbolos ts, ErrorReporter rep) {
         ParseTreeWalker.DEFAULT.walk(new MiListener(ts, rep), tree);
     }

@@ -11,51 +11,78 @@ public class CodeGenVisitor extends CminiBaseVisitor<String> {
         this.gen = gen;
     }
 
-    // program: visit hijos
+    // Programa
     @Override
     public String visitProgram(CminiParser.ProgramContext ctx) {
-        return super.visitProgram(ctx);
+        gen.emit("Código de tres direcciones generado");
+        gen.emit("PROGRAMA_INICIO:");
+
+        for (var child : ctx.children) {
+            visit(child);
+        }
+
+        gen.emit("PROGRAMA_FIN:");
+        return null;
     }
 
+    // Funciones 
     @Override
     public String visitFunctionDecl(CminiParser.FunctionDeclContext ctx) {
         String fname = ctx.ID().getText();
-        gen.emit(fname + ":");
+        gen.emit("func_" + fname + ":");
 
+        // parámetros
         if (ctx.paramList() != null) {
             for (CminiParser.ParamContext p : ctx.paramList().param()) {
                 String pname = p.ID().getText();
-                gen.emit("param " + pname);
+                gen.emit("PARAM " + pname + " " + p.type().getText());
             }
+        }
+
+        // si es main, inicializar activo
+        if (fname.equals("main")) {
+            gen.emit("activo = false");
         }
 
         visit(ctx.block());
         return null;
     }
 
-    @Override
-    public String visitBlock(CminiParser.BlockContext ctx) {
-        return super.visitBlock(ctx);
-    }
-
+    //  Declaración 
     @Override
     public String visitVarDecl(CminiParser.VarDeclContext ctx) {
-        if (ctx.expr() != null) {
-            String rhs = visit(ctx.expr());
-            String id = ctx.ID().getText();
+        String id = ctx.ID().getText();
+        String tipo = ctx.type().getText();
+
+        if (ctx.INT() != null) {
+            gen.emit("DECLARE " + id + "[" + ctx.INT().getText() + "] " + tipo);
+        } else {
+            gen.emit("DECLARE " + id + " " + tipo);
+            // inicialización de bool a false
+            if (tipo.equals("bool")) {
+                gen.emit(id + " = false");
+            }
+        }
+        return null;
+    }
+
+    //  Asignación 
+    @Override
+    public String visitAssignStat(CminiParser.AssignStatContext ctx) {
+        String id = ctx.ID().getText();
+
+        if (ctx.expr().size() == 2) { // array
+            String index = visit(ctx.expr(0));
+            String rhs = visit(ctx.expr(1));
+            gen.emit(id + "[" + index + "] = " + rhs);
+        } else { // variable normal
+            String rhs = visit(ctx.expr(0));
             gen.emit(id + " = " + rhs);
         }
         return null;
     }
 
-    @Override
-    public String visitAssignStat(CminiParser.AssignStatContext ctx) {
-        String id = ctx.ID().getText();
-        String rhs = visit(ctx.expr());
-        gen.emit(id + " = " + rhs);
-        return null;
-    }
-
+    //  Return 
     @Override
     public String visitReturnStat(CminiParser.ReturnStatContext ctx) {
         if (ctx.expr() != null) {
@@ -67,113 +94,111 @@ public class CodeGenVisitor extends CminiBaseVisitor<String> {
         return null;
     }
 
+    //  Expresiones 
     @Override
     public String visitExpr(CminiParser.ExprContext ctx) {
-        if (ctx.INT() != null)  return ctx.INT().getText();
-        if (ctx.FLOAT() != null) return ctx.FLOAT().getText();
+        // literales
+        if (ctx.literal() != null) return ctx.getText();
 
-        if (ctx.ID() != null && ctx.op == null && ctx.funcCall() == null) {
-            return ctx.ID().getText();
-        }
-
-        if (ctx.getChildCount() == 3 && "(".equals(ctx.getChild(0).getText())) {
-            return visit(ctx.expr(0));
-        }
-
-        if (ctx.op != null && ctx.expr().size() == 2) {
+        // array directo en operación binaria
+        if (ctx.expr().size() == 2) {
             String a = visit(ctx.expr(0));
             String b = visit(ctx.expr(1));
-            String op = ctx.op.getText();
+            String op = ctx.getChild(1).getText();
             String res = gen.newTemp().getName();
             gen.emit(res + " = " + a + " " + op + " " + b);
             return res;
         }
 
+        // acceso a array aislado
+        if (ctx.ID() != null && ctx.getChildCount() == 4) {
+            String index = visit(ctx.expr(0));
+            Temp t = gen.newTemp();
+            gen.emit(t.getName() + " = " + ctx.ID().getText() + "[" + index + "]");
+            return t.getName();
+        }
+
+        // identificador solo
+        if (ctx.ID() != null && ctx.getChildCount() == 1) {
+            return ctx.ID().getText();
+        }
+
+        // paréntesis
+        if (ctx.getChildCount() == 3 && "(".equals(ctx.getChild(0).getText())) {
+            return visit(ctx.expr(0));
+        }
+
+        // llamada a función
         if (ctx.funcCall() != null) {
             String fname = ctx.funcCall().ID().getText();
-
+            StringBuilder args = new StringBuilder();
             if (ctx.funcCall().argList() != null) {
                 for (CminiParser.ExprContext arg : ctx.funcCall().argList().expr()) {
                     String val = visit(arg);
-                    gen.emit("param " + val);
+                    if (args.length() > 0) args.append(", ");
+                    args.append(val);
                 }
             }
-
-            Temp res = gen.newTemp();
-            gen.emit(res.getName() + " = call " + fname);
-            return res.getName();
+            gen.emit("CALL func_" + fname + (args.length() > 0 ? ", " + args : ""));
+            return "RETURN_VALUE";
         }
 
         return null;
     }
-
+    //  If 
     @Override
     public String visitIfStat(CminiParser.IfStatContext ctx) {
         String cond = visit(ctx.expr());
-        Label Ltrue = gen.newLabel();
-        Label Lend = gen.newLabel();
+        Label Lthen = gen.newLabel("THEN");
+        Label Lend = gen.newLabel("END_IF");
 
-        gen.emit("if " + cond + " goto " + Ltrue.getName());
+        gen.emit("if " + cond + " goto " + Lthen.getName());
         gen.emit("goto " + Lend.getName());
 
-        gen.emit(Ltrue.toString());
+        gen.emit(Lthen.toString() + ":");
         visit(ctx.statement(0));
 
-        if (ctx.statement().size() > 1) {
-            Label Lelse = gen.newLabel();
-            Label Lafter = gen.newLabel();
-            gen.emit("goto " + Lafter.getName());
-
-            gen.emit(Lelse.toString());
-            visit(ctx.statement(1));
-
-            gen.emit(Lafter.toString());
-        } else {
-            gen.emit(Lend.toString());
-        }
+        gen.emit(Lend.toString() + ":");
         return null;
     }
 
+    //  While 
     @Override
     public String visitWhileStat(CminiParser.WhileStatContext ctx) {
-        Label Lbegin = gen.newLabel();
-        Label Lend = gen.newLabel();
+        Label Lbegin = gen.newLabel("WHILE");
+        Label Lend = gen.newLabel("END_WHILE");
 
-        gen.emit(Lbegin.toString());
+        gen.emit(Lbegin.toString() + ":");
         String cond = visit(ctx.expr());
-        gen.emit("if " + cond + " goto " + Lend.getName());
+        gen.emit(gen.nextInstr() + ": if " + cond + " goto " + Lend.getName());
 
         visit(ctx.statement());
 
-        gen.emit("goto " + Lbegin.getName());
-        gen.emit(Lend.toString());
-
+        gen.emit(gen.nextInstr() + ": goto " + Lbegin.getName());
+        gen.emit(Lend.toString() + ":");
         return null;
     }
 
+    //  For 
     @Override
     public String visitForStat(CminiParser.ForStatContext ctx) {
-
         if (ctx.varDecl() != null) visit(ctx.varDecl());
         if (ctx.assignStat(0) != null) visit(ctx.assignStat(0));
 
-        Label Lbegin = gen.newLabel();
-        Label Lend = gen.newLabel();
+        Label Lbegin = gen.newLabel("FOR");
+        Label Lend = gen.newLabel("END_FOR");
 
-        gen.emit(Lbegin.toString());
-
+        gen.emit(Lbegin.toString() + ":");
         if (ctx.expr() != null) {
             String cond = visit(ctx.expr());
-            gen.emit("if " + cond + " goto " + Lend.getName());
+            gen.emit(gen.nextInstr() + ": if " + cond + " goto " + Lend.getName());
         }
 
         visit(ctx.statement());
-
         if (ctx.assignStat(1) != null) visit(ctx.assignStat(1));
 
-        gen.emit("goto " + Lbegin.getName());
-        gen.emit(Lend.toString());
-
+        gen.emit(gen.nextInstr() + ": goto " + Lbegin.getName());
+        gen.emit(Lend.toString() + ":");
         return null;
     }
 }

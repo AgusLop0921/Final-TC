@@ -26,7 +26,7 @@ public class App {
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         CminiParser parser = new CminiParser(tokens);
 
-        // Error sintáctico personalizado
+        // Error sintactico personalizado
         ErrorReporter reporterSyntax = new ErrorReporter();
         BaseErrorListener synErr = new BaseErrorListener(reporterSyntax);
         parser.removeErrorListeners();
@@ -34,11 +34,11 @@ public class App {
         parser.addErrorListener(synErr);
         lexer.addErrorListener(synErr);
 
-        // Árbol sintáctico
+        // Árbol sintactico
         ParseTree tree = parser.program();
-        System.out.println(tree.toStringTree(parser)); // TP2 pide árbol ANTLR
+        System.out.println(tree.toStringTree(parser));
 
-        // Tabla de símbolos + Listener semántico
+        // Tabla de simbolos + Listener semantico
         ErrorReporter reporter = new ErrorReporter();
         TablaDeSimbolos ts = new TablaDeSimbolos();
         MiListener.walk((CminiParser.ProgramContext) tree, ts, reporter);
@@ -47,7 +47,7 @@ public class App {
         Files.createDirectories(Path.of("reports"));
         reporter.guardar("reports/syntax.txt", "reports/semantic.txt");
 
-        // Dump de la Tabla de Símbolos (simple)
+        // Dump de la Tabla de simbolos (simple)
         StringBuilder sb = new StringBuilder();
         ts.historial().forEach(ctx -> {
             sb.append("Contexto: ").append(ctx.nombre()).append("\n");

@@ -23,6 +23,10 @@ public class TablaDeSimbolos {
         historial.add(c);
     }
 
+    public Contexto global() {
+    return pila.peekFirst(); 
+    }
+
     public void pop() { pila.pop(); }
 
     public List<Contexto> historial() { return historial; }

@@ -1,6 +1,7 @@
 grammar Cmini;
 
-// --- Parser rules ---
+// ---------------- Parser rules ----------------
+
 program
     : (functionDecl | statement)* EOF
     ;
@@ -35,13 +36,14 @@ statement
     | block
     ;
 
-// Declaraciones y asignaciones
+// Declaraciones (array opcional)
 varDecl
-    : type ID ('=' expr)?
+    : type ID ('[' INT ']')?
     ;
 
+// Asignación (soporta array[i] = expr)
 assignStat
-    : ID '=' expr
+    : (ID ('[' expr ']')?) '=' expr
     ;
 
 // Control de flujo
@@ -73,29 +75,58 @@ argList
 
 // Expresiones
 expr
-    : expr op=('*'|'/') expr
-    | expr op=('+'|'-') expr
-    | expr op=('=='|'!='|'<'|'>'|'<='|'>=') expr
-    | ID
-    | INT
-    | FLOAT
+    : expr ('*' | '/' | MOD) expr
+    | expr ('+' | '-') expr
+    | expr ('==' | '!=' | '<' | '>' | '<=' | '>=') expr
+    | ID ('[' expr ']')?
+    | literal
     | funcCall
     | '(' expr ')'
     ;
 
-// --- Lexer rules ---
-type  : 'int' | 'float' | 'void' ;
+// Literales
+literal
+    : INT
+    | FLOAT
+    | CHAR_LITERAL
+    | TRUE
+    | FALSE
+    ;
 
-ID    : [a-zA-Z_][a-zA-Z_0-9]* ;
-INT   : [0-9]+ ;
-FLOAT : [0-9]+'.'[0-9]+ ;
+// ---------------- Lexer rules ----------------
 
-WS    : [ \t\r\n]+ -> skip ;    
+// Tipos
+type
+    : 'int'
+    | 'float'
+    | 'double'
+    | 'char'
+    | 'bool'
+    | 'void'
+    ;
 
-// Comentarios
+// Identificadores y números
+ID     : [a-zA-Z_][a-zA-Z_0-9]* ;
+INT    : [0-9]+ ;
+FLOAT  : [0-9]+ '.' [0-9]+ ;
+
+// Bool literals
+TRUE   : 'true' ;
+FALSE  : 'false' ;
+
+// Char literal
+CHAR_LITERAL : '\'' . '\'' ;
+
+// Operador módulo
+MOD    : '%' ;
+
+// Espacios y comentarios
+WS    : [ \t\r\n]+ -> skip ;
+
 COMMENT
-      : '//' ~[\r\n]* -> skip
-      ;
+    : '//' ~[\r\n]* -> skip
+    ;
+
 MULTILINE_COMMENT
-      : '/*' .*? '*/' -> skip
-      ;
+    : '/*' .*? '*/' -> skip
+    ;
