@@ -3,23 +3,20 @@ package tc.symbols;
 public abstract class Id {
     protected final String nombre;
     protected final Tipo tipo;
-    protected String valor;         // texto crudo (opcional para TP2)
-    protected boolean usada = false;
-    protected boolean inicializada = false;
+    protected final int linea;
+    protected final int columna;
 
-    protected Id(String nombre, Tipo tipo) {
+    public Id(String nombre, Tipo tipo, int linea, int columna) {
         this.nombre = nombre;
         this.tipo = tipo;
+        this.linea = linea;
+        this.columna = columna;
     }
 
     public String nombre() { return nombre; }
     public Tipo tipo() { return tipo; }
+    public int linea() { return linea; }
+    public int columna() { return columna; }
 
-    public boolean usada() { return usada; }
-    public boolean inicializada() { return inicializada; }
-
-    public void marcarUsada() { this.usada = true; }
-    public void marcarInicializada() { this.inicializada = true; }
-    public void setValor(String v) { this.valor = v; }
-    public String valor() { return valor; }
+    public boolean esFuncion() { return false; }
 }

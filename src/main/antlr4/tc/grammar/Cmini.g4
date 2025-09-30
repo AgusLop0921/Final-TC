@@ -36,9 +36,9 @@ statement
     | block
     ;
 
-// Declaraciones (array opcional)
+// Declaraciones (array opcional + inicialización opcional)
 varDecl
-    : type ID ('[' INT ']')?
+    : type ID ('[' INT ']')? ('=' expr)?
     ;
 
 // Asignación (soporta array[i] = expr)
@@ -56,9 +56,9 @@ whileStat
     ;
 
 forStat
-    : 'for' '(' (varDecl | assignStat)? ';' expr? ';' assignStat? ')' statement
+    : 'for' '(' (varDecl | assignStat)? ';' expr? ';' (assignStat | expr)? ')' statement
     ;
-
+    
 // Return
 returnStat
     : 'return' expr?
@@ -82,6 +82,8 @@ expr
     | literal
     | funcCall
     | '(' expr ')'
+    | ID '++' 
+    | ID '--'          
     ;
 
 // Literales
@@ -102,6 +104,7 @@ type
     | 'double'
     | 'char'
     | 'bool'
+    | 'string'
     | 'void'
     ;
 

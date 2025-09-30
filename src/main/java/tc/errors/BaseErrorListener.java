@@ -7,9 +7,7 @@ public class BaseErrorListener extends org.antlr.v4.runtime.BaseErrorListener {
 
     private final ErrorReporter reporter;
 
-    public BaseErrorListener(ErrorReporter reporter) {
-        this.reporter = reporter;
-    }
+    public BaseErrorListener(ErrorReporter reporter) { this.reporter = reporter; }
 
     @Override
     public void syntaxError(Recognizer<?, ?> recognizer,
@@ -19,9 +17,6 @@ public class BaseErrorListener extends org.antlr.v4.runtime.BaseErrorListener {
                             String msg,
                             RecognitionException e) {
         String error = "L" + line + ":" + charPositionInLine + " - " + msg;
-        System.err.println(error);
-        if (reporter != null) {
-            reporter.addSyntax(error);
-        }
+        if (reporter != null) reporter.addSyntax(error);
     }
 }

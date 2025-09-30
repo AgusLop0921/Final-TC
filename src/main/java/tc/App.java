@@ -9,9 +9,9 @@ import tc.grammar.CminiParser;
 import tc.semantics.ErrorReporter;
 import tc.semantics.MiListener;
 import tc.symbols.TablaDeSimbolos;
-
 import tc.intermediate.CodeGenerator;
 import tc.intermediate.CodeGenVisitor;
+import tc.utils.ReportUtils;
 
 import java.nio.file.*;
 
@@ -20,13 +20,13 @@ public class App {
         String inputFile = args.length > 0 ? args[0] : "samples/ok_semantic.c";
         String code = Files.readString(Path.of(inputFile));
 
-        // Lexer/Parser
+        // Lexer + Parser
         CharStream cs = CharStreams.fromString(code);
         CminiLexer lexer = new CminiLexer(cs);
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         CminiParser parser = new CminiParser(tokens);
 
-        // Error sintactico personalizado
+        // Error sintáctico
         ErrorReporter reporterSyntax = new ErrorReporter();
         BaseErrorListener synErr = new BaseErrorListener(reporterSyntax);
         parser.removeErrorListeners();
@@ -34,46 +34,29 @@ public class App {
         parser.addErrorListener(synErr);
         lexer.addErrorListener(synErr);
 
-        // Árbol sintactico
+        // Árbol
         ParseTree tree = parser.program();
-        System.out.println(tree.toStringTree(parser));
 
-        // Tabla de simbolos + Listener semantico
+        // Semántico
         ErrorReporter reporter = new ErrorReporter();
         TablaDeSimbolos ts = new TablaDeSimbolos();
         MiListener.walk((CminiParser.ProgramContext) tree, ts, reporter);
 
-        // Guardar reportes
-        Files.createDirectories(Path.of("reports"));
-        reporter.guardar("reports/syntax.txt", "reports/semantic.txt");
+        // === REPORTES BONITOS ===
+        ReportUtils.printLexical(tokens);
+        ReportUtils.printSyntax(reporterSyntax);
+        ReportUtils.printAST();
+        ReportUtils.printSemantic(ts, reporter);
 
-        // Dump de la Tabla de simbolos (simple)
-        StringBuilder sb = new StringBuilder();
-        ts.historial().forEach(ctx -> {
-            sb.append("Contexto: ").append(ctx.nombre()).append("\n");
-            ctx.ids().forEach((k, v) -> sb.append("  ")
-                    .append(v.tipo()).append(" ").append(v.nombre())
-                    .append(v.inicializada() ? " [init]" : " [no init]")
-                    .append(v.usada() ? " [used]" : " [no used]")
-                    .append(v.valor() != null ? " = " + v.valor() : "")
-                    .append("\n"));
-            sb.append("\n");
-        });
-        Files.writeString(Path.of("reports/symbols.txt"), sb.toString());
+        // TAC
+        if (!reporter.haySemanticos()) {
+            CodeGenerator cg = new CodeGenerator();
+            CodeGenVisitor codegen = new CodeGenVisitor(cg);
+            codegen.visit(tree);
 
-        if (reporter.haySemanticos()) {
-            System.err.println("Se detectaron errores semánticos. Revisar reports/semantic.txt");
-        } else {
-            System.out.println("TP2: Árbol + TS generados sin errores semánticos.");
+            Files.createDirectories(Path.of("reports"));
+            Files.writeString(Path.of("reports/intermediate.txt"), cg.dump());
+            System.out.println("TAC generado en reports/intermediate.txt");
         }
-        reporterSyntax.guardar("reports/syntax.txt", null);
-
-        CodeGenerator cg = new CodeGenerator();
-        CodeGenVisitor codegen = new CodeGenVisitor(cg);
-        codegen.visit(tree);
-
-        java.nio.file.Files.createDirectories(java.nio.file.Path.of("reports"));
-        java.nio.file.Files.writeString(java.nio.file.Path.of("reports/intermediate.txt"), cg.dump());
-        System.out.println("TAC generado en reports/intermediate.txt");
     }
 }

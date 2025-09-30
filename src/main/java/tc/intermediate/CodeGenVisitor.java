@@ -168,17 +168,24 @@ public class CodeGenVisitor extends CminiBaseVisitor<String> {
         Label Lbegin = gen.newLabel("WHILE");
         Label Lend = gen.newLabel("END_WHILE");
 
+        // inicio del bucle
         gen.emit(Lbegin.toString() + ":");
-        String cond = visit(ctx.expr());
-        gen.emit(gen.nextInstr() + ": if " + cond + " goto " + Lend.getName());
 
+        // condición
+        String cond = visit(ctx.expr());
+        gen.emit("ifFalse " + cond + " goto " + Lend.getName());
+
+        // cuerpo
         visit(ctx.statement());
 
-        gen.emit(gen.nextInstr() + ": goto " + Lbegin.getName());
+        // volver al inicio
+        gen.emit("goto " + Lbegin.getName());
+
+        // fin
         gen.emit(Lend.toString() + ":");
         return null;
     }
-
+    
     //  For 
     @Override
     public String visitForStat(CminiParser.ForStatContext ctx) {
@@ -189,15 +196,24 @@ public class CodeGenVisitor extends CminiBaseVisitor<String> {
         Label Lend = gen.newLabel("END_FOR");
 
         gen.emit(Lbegin.toString() + ":");
-        if (ctx.expr() != null) {
-            String cond = visit(ctx.expr());
-            gen.emit(gen.nextInstr() + ": if " + cond + " goto " + Lend.getName());
+
+        // condición del for → está en la primera expr (si existe)
+        if (!ctx.expr().isEmpty()) {
+            String cond = visit(ctx.expr(0));
+            gen.emit("ifFalse " + cond + " goto " + Lend.getName());
         }
 
         visit(ctx.statement());
-        if (ctx.assignStat(1) != null) visit(ctx.assignStat(1));
 
-        gen.emit(gen.nextInstr() + ": goto " + Lbegin.getName());
+        // actualización (última parte del for), puede ser assign o expr tipo i++
+        if (ctx.assignStat().size() > 1) {
+            visit(ctx.assignStat(1));
+        } else if (ctx.expr().size() > 1) {
+            // por ejemplo i++
+            visit(ctx.expr(1));
+        }
+
+        gen.emit("goto " + Lbegin.getName());
         gen.emit(Lend.toString() + ":");
         return null;
     }
