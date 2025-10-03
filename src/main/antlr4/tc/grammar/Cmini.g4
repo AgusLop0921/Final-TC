@@ -26,14 +26,19 @@ block
 
 // Sentencias
 statement
-    : varDecl ';'
-    | assignStat ';'
+    : simpleStatement ';'
     | ifStat
     | whileStat
     | forStat
     | returnStat ';'
-    | funcCall ';'
     | block
+    ;
+
+// Sentencias simples (las que requieren ;)
+simpleStatement
+    : varDecl
+    | assignStat
+    | funcCall
     ;
 
 // Declaraciones (array opcional + inicialización opcional)
@@ -82,6 +87,7 @@ expr
     | literal
     | funcCall
     | '(' expr ')'
+    | '(' type ')' expr       // casting (ej: (int)pr)
     | ID '++' 
     | ID '--'          
     ;
