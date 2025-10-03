@@ -43,7 +43,7 @@ public class App {
     // REPORTES
     ReportUtils.printLexical(tokens);
     ReportUtils.printSyntax(reporterSyntax);
-    ReportUtils.printAST(tree, parser, inputFile);
+    ReportUtils.printAST(tree, parser);
     ReportUtils.printSemantic(ts, reporter);
 
     // TAC

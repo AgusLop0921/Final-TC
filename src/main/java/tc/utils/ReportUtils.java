@@ -12,23 +12,41 @@ import tc.symbols.TablaDeSimbolos;
 
 public class ReportUtils {
 
-  public static void printLexical(CommonTokenStream tokens) {
-    System.out.println("\n=== 1. ANÁLISIS LÉXICO ===");
-    System.out.println("Análisis léxico completado sin errores.");
-    System.out.println(" Tokens procesados: " + tokens.getTokens().size());
-    // System.out.println("Tokens: " + tokens.getTokens());
+  public static void printLexical(CommonTokenStream tokens) throws Exception {
+      System.out.println("\n=== 1. ANÁLISIS LÉXICO ===");
+      System.out.println("Análisis léxico completado sin errores.");
+      System.out.println(" Tokens procesados: " + tokens.getTokens().size());
+
+      Files.createDirectories(Path.of("reports"));
+      Path tokFile = Path.of("reports/tokens.txt");
+
+      StringBuilder sb = new StringBuilder();
+      tokens.getTokens().forEach(t -> sb.append(t.toString()).append("\n"));
+      Files.writeString(tokFile, sb.toString());
+
+      System.out.println("Tokens exportados en: " + tokFile.toAbsolutePath());
   }
 
-  public static void printSyntax(ErrorReporter syntaxReporter) {
-    System.out.println("\n=== 2. ANÁLISIS SINTÁCTICO ===");
-    if (syntaxReporter.getSyntax().isEmpty()) {
-      System.out.println("Análisis sintáctico completado sin errores.");
-    } else {
-      syntaxReporter.getSyntax().forEach(e -> System.err.println("❌ " + e));
-    }
+  public static void printSyntax(ErrorReporter syntaxReporter) throws Exception {
+      System.out.println("\n=== 2. ANÁLISIS SINTÁCTICO ===");
+
+      Files.createDirectories(Path.of("reports"));
+      Path syntaxFile = Path.of("reports/syntax.txt");
+
+      StringBuilder sb = new StringBuilder();
+      if (syntaxReporter.getSyntax().isEmpty()) {
+          sb.append("Análisis sintáctico completado sin errores.\n");
+      } else {
+          syntaxReporter.getSyntax().forEach(e -> sb.append("❌ ").append(e).append("\n"));
+      }
+
+      Files.writeString(syntaxFile, sb.toString());
+      System.out.println(sb);
+      System.out.println("Errores de sintaxis exportados en: " + syntaxFile.toAbsolutePath());
   }
 
-  public static void printAST(ParseTree tree, CminiParser parser, String inputFile) throws Exception {
+
+  public static void printAST(ParseTree tree, CminiParser parser) throws Exception {
       System.out.println("\n=== 3. VISUALIZACIÓN DEL AST ===");
 
       System.out.println(tree.toStringTree(parser));
@@ -37,8 +55,7 @@ public class ReportUtils {
 
       Files.createDirectories(Path.of("reports"));
 
-      String baseName = Path.of(inputFile).getFileName().toString().replace(".c", "");
-      Path dotFile = Path.of("reports/" + baseName + "_ast.dot");
+      Path dotFile = Path.of("reports/semantic_ast.dot");
 
       Files.writeString(dotFile, dot);
 
