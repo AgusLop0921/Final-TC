@@ -20,7 +20,6 @@ int main() {
     int estado;
     int temp;
     int numeros[3];
-    
     // Inicializar variables globales
     contadorGlobal = 0;
     valorPi = 3.14;

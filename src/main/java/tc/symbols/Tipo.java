@@ -29,12 +29,10 @@ public enum Tipo {
   // Compatibilidad y promoción simple
   public static boolean asignable(Tipo destino, Tipo origen) {
     if (destino == DESCONOCIDO || origen == DESCONOCIDO) return false;
-    if (destino == origen) return true;
-
     // Promociones permitidas
     if (destino == FLOAT && origen == INT) return true;
     if (destino == DOUBLE && (origen == INT || origen == FLOAT)) return true;
 
-    return false;
+    return destino == origen;
   }
 }

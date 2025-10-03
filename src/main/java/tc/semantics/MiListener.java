@@ -105,6 +105,17 @@ public class MiListener extends CminiBaseListener {
 
     Variable v = new Variable(id, t, dimension, linea, columna);
 
+    if (ctx.expr() != null) {
+        Tipo rhs = inferirExpr(ctx.expr());
+        if (!Tipo.asignable(v.tipo(), rhs)) {
+            err(ctx.ID().getSymbol(),
+                "Tipos incompatibles en inicialización de '" + id + "': " 
+                + v.tipo() + " <- " + rhs);
+        } else {
+            v.marcarInicializada();
+        }
+    }
+
     if (!ts.actual().declarar(v)) {
       err(ctx.ID().getSymbol(), "Doble declaración del mismo identificador: '" + id + "'");
     } else {
@@ -141,10 +152,11 @@ public class MiListener extends CminiBaseListener {
         Tipo rhs = inferirExpr(ctx.expr(0));
 
         if (!Tipo.asignable(v.tipo(), rhs)) {
-          err(idTok, "Tipos incompatibles en Asignacion a '" + id + "'");
+            err(idTok, "Tipos incompatibles en asignacion a '" + id + "': " 
+                + v.tipo() + " <- " + rhs);
         } else {
-          v.marcarInicializada();
-          v.setValor(ctx.expr(0).getText());
+            v.marcarInicializada();
+            v.setValor(ctx.expr(0).getText());
         }
       }
     }
